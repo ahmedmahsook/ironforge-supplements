@@ -1,31 +1,59 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useCart } from "../context/CartContext"
-import { useAuth } from "../context/AuthContext"
-import api from "../api/api"
-import PageContainer from "../components/layout/PageContainer"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+
+import api from "../api/api";
+
+import PageContainer from "../components/layout/PageContainer";
 
 export default function Checkout() {
-  const navigate = useNavigate()
-  const { cart = [], clearCart, totalPrice = 0 } = useCart()
-  const { user, updateUser } = useAuth()
+  const navigate = useNavigate();
 
-  const [address, setAddress] = useState({
-    name: "",
-    street: "",
-    city: "",
-    pincode: "",
-  })
+  const {
+    cart = [],
+    clearCart,
+    totalPrice = 0,
+  } = useCart();
 
-  const [paymentMethod, setPaymentMethod] = useState("cod")
-  const [transactionId, setTransactionId] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+  const { user } = useAuth();
+
+  const [address, setAddress] =
+    useState({
+      name: "",
+      phone: "",
+      house_name: "",
+      street: "",
+      city: "",
+      state: "",
+      pincode: "",
+    });
+
+  const [
+    paymentMethod,
+    setPaymentMethod,
+  ] = useState("cod");
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  /* ================= AUTH ================= */
 
   if (!user) {
-    navigate("/login", { state: { from: "/checkout" } })
-    return null
+    navigate("/login", {
+      state: {
+        from: "/checkout",
+      },
+    });
+
+    return null;
   }
+
+  /* ================= EMPTY CART ================= */
 
   if (cart.length === 0) {
     return (
@@ -34,113 +62,327 @@ export default function Checkout() {
           Your cart is empty
         </p>
       </PageContainer>
-    )
+    );
   }
+
+  /* ================= INPUT ================= */
 
   const handleChange = (e) => {
-    setAddress({ ...address, [e.target.name]: e.target.value })
-  }
+    setAddress({
+      ...address,
 
-  const handlePlaceOrder = async () => {
-    if (!address.name || !address.street || !address.city || !address.pincode) {
-      setError("Fill all fields")
-      return
-    }
+      [e.target.name]:
+        e.target.value,
+    });
+  };
 
-    if (paymentMethod === "upi" && !transactionId.trim()) {
-      setError("Enter UPI ID")
-      return
-    }
+  /* ================= PLACE ORDER ================= */
 
-    setLoading(true)
+  const handlePlaceOrder =
+    async () => {
+      if (
+        !address.name ||
+        !address.phone ||
+        !address.house_name ||
+        !address.street ||
+        !address.city ||
+        !address.state ||
+        !address.pincode
+      ) {
+        setError(
+          "Fill all fields"
+        );
 
-    try {
-      const { data: latestUser } = await api.get(`/users/${user.id}`)
-
-      const newOrder = {
-        id: "ORD-" + Date.now(),
-        items: cart,
-        address,
-        paymentMethod,
-        transactionId,
-        total: totalPrice,
+        return;
       }
 
-      await api.patch(`/users/${user.id}`, {
-        orders: [...(latestUser.orders || []), newOrder],
-        cart: [],
-      })
+      setLoading(true);
 
-      updateUser({
-        ...latestUser,
-        orders: [...(latestUser.orders || []), newOrder],
-        cart: [],
-      })
+      setError("");
 
-      clearCart()
-      navigate("/orders")
-    } catch {
-      setError("Order failed")
-    } finally {
-      setLoading(false)
-    }
-  }
+      try {
+        const { data } =
+          await api.post(
+            "/orders",
+            {
+              payment_method:
+                paymentMethod,
+
+              name:
+                address.name,
+
+              phone:
+                address.phone,
+
+              house_name:
+                address.house_name,
+
+              street:
+                address.street,
+
+              city:
+                address.city,
+
+              state:
+                address.state,
+
+              pincode:
+                address.pincode,
+            }
+          );
+
+        /* ================= COD ================= */
+
+        if (
+          paymentMethod === "cod"
+        ) {
+          await clearCart();
+
+          navigate(
+            "/order-success"
+          );
+
+          return;
+        }
+
+        /* ================= RAZORPAY ================= */
+
+        const options = {
+         key: "rzp_test_SjLBPQRolOyB8r",
+
+          amount:
+            data.total_amount *
+            100,
+
+          currency: "INR",
+
+          name: "IronForge",
+
+          description:
+            "Order Payment",
+
+          order_id:
+            data.payment_id,
+
+          handler:
+            async function (
+              response
+            ) {
+
+              console.log(
+                "RAZORPAY SUCCESS",
+                response
+              );
+
+              try {
+
+                const verifyRes =
+                  await api.post(
+                    "/payments/verify",
+                    {
+                      razorpay_order_id:
+                        response.razorpay_order_id,
+
+                      razorpay_payment_id:
+                        response.razorpay_payment_id,
+
+                      razorpay_signature:
+                        response.razorpay_signature,
+                    }
+                  );
+
+                console.log(
+                  "VERIFY RESPONSE",
+                  verifyRes.data
+                );
+
+                await clearCart();
+
+                navigate(
+                  "/order-success"
+                );
+
+              } catch (err) {
+
+                console.error(
+                  "VERIFY ERROR",
+                  err.response?.data ||
+                    err
+                );
+
+                setError(
+                  err.response?.data
+                    ?.error ||
+                    "Payment verification failed"
+                );
+              }
+            },
+
+          prefill: {
+            name:
+              address.name,
+
+            contact:
+              address.phone,
+
+            email:
+              user.email,
+          },
+
+          theme: {
+            color:
+              "#22c55e",
+          },
+        };
+
+        console.log(
+          "RAZORPAY OPTIONS",
+          options
+        );
+
+        const razor =
+          new window.Razorpay(
+            options
+          );
+
+        razor.open();
+
+      } catch (err) {
+
+        console.error(
+          "ORDER ERROR",
+          err.response?.data ||
+            err
+        );
+
+        setError(
+          err.response?.data
+            ?.error ||
+            "Order failed"
+        );
+
+      } finally {
+        setLoading(false);
+      }
+    };
 
   return (
     <PageContainer>
-
       <div className="max-w-6xl mx-auto py-14">
-
         {/* HEADER */}
+
         <div className="mb-12">
           <h1 className="text-4xl font-semibold text-white">
             Checkout
           </h1>
+
           <p className="text-gray-400 text-sm mt-2">
-            Enter details and complete your purchase
+            Enter details and
+            complete your
+            purchase
           </p>
         </div>
 
-        {error && <p className="text-red-400 mb-6">{error}</p>}
+        {/* ERROR */}
+
+        {error && (
+          <p className="text-red-400 mb-6">
+            {error}
+          </p>
+        )}
 
         <div className="grid lg:grid-cols-[1.6fr_1fr] gap-14">
 
-          {/* LEFT SIDE */}
+          {/* LEFT */}
+
           <div className="space-y-12">
 
             {/* ADDRESS */}
+
             <div>
               <h2 className="text-lg font-semibold text-white mb-5">
                 Shipping Address
               </h2>
 
               <div className="grid md:grid-cols-2 gap-4">
+
                 {[
-                  { key: "name", label: "Full Name" },
-                  { key: "street", label: "Street Address" },
-                  { key: "city", label: "City" },
-                  { key: "pincode", label: "Pincode" },
-                ].map(({ key, label }) => (
-                  <input
-                    key={key}
-                    name={key}
-                    value={address[key]}
-                    onChange={handleChange}
-                    placeholder={label}
-                    className="
-                      px-4 py-3 rounded-lg
-                      bg-[#111]
-                      border border-zinc-800
-                      text-white
-                      focus:outline-none
-                      focus:border-green-500
-                    "
-                  />
-                ))}
+                  {
+                    key: "name",
+                    label:
+                      "Full Name",
+                  },
+
+                  {
+                    key: "phone",
+                    label:
+                      "Phone Number",
+                  },
+
+                  {
+                    key:
+                      "house_name",
+                    label:
+                      "House Name",
+                  },
+
+                  {
+                    key: "street",
+                    label:
+                      "Street Address",
+                  },
+
+                  {
+                    key: "city",
+                    label: "City",
+                  },
+
+                  {
+                    key: "state",
+                    label: "State",
+                  },
+
+                  {
+                    key:
+                      "pincode",
+                    label:
+                      "Pincode",
+                  },
+                ].map(
+                  ({
+                    key,
+                    label,
+                  }) => (
+                    <input
+                      key={key}
+                      name={key}
+                      value={
+                        address[
+                          key
+                        ]
+                      }
+                      onChange={
+                        handleChange
+                      }
+                      placeholder={
+                        label
+                      }
+                      className="
+                        px-4 py-3 rounded-lg
+                        bg-[#111]
+                        border border-zinc-800
+                        text-white
+                        focus:outline-none
+                        focus:border-green-500
+                      "
+                    />
+                  )
+                )}
               </div>
             </div>
 
             {/* PAYMENT */}
+
             <div>
               <h2 className="text-lg font-semibold text-white mb-5">
                 Payment Method
@@ -149,12 +391,18 @@ export default function Checkout() {
               <div className="grid gap-4">
 
                 {/* COD */}
+
                 <div
-                  onClick={() => setPaymentMethod("cod")}
+                  onClick={() =>
+                    setPaymentMethod(
+                      "cod"
+                    )
+                  }
                   className={`
                     p-4 rounded-xl cursor-pointer border transition
                     ${
-                      paymentMethod === "cod"
+                      paymentMethod ===
+                      "cod"
                         ? "border-green-500 bg-green-500/10"
                         : "border-zinc-800 hover:border-zinc-600"
                     }
@@ -163,110 +411,104 @@ export default function Checkout() {
                   <p className="text-white font-medium">
                     Cash on Delivery
                   </p>
+
                   <p className="text-gray-400 text-sm">
                     Pay when product arrives
                   </p>
                 </div>
 
-                {/* UPI */}
+                {/* RAZORPAY */}
+
                 <div
-                  onClick={() => setPaymentMethod("upi")}
+                  onClick={() =>
+                    setPaymentMethod(
+                      "razorpay"
+                    )
+                  }
                   className={`
                     p-4 rounded-xl cursor-pointer border transition
                     ${
-                      paymentMethod === "upi"
+                      paymentMethod ===
+                      "razorpay"
                         ? "border-green-500 bg-green-500/10"
                         : "border-zinc-800 hover:border-zinc-600"
                     }
                   `}
                 >
                   <p className="text-white font-medium">
-                    UPI Payment
-                  </p>
-                  <p className="text-gray-400 text-sm">
-                    Pay using Google Pay / PhonePe / Paytm
+                    Online Payment
                   </p>
 
-                  {paymentMethod === "upi" && (
-                    <input
-                      type="text"
-                      placeholder="Enter Transaction ID"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      className="
-                        mt-3 w-full px-3 py-2 rounded-md
-                        bg-[#0d0d0d]
-                        border border-zinc-700
-                        text-white text-sm
-                        focus:outline-none
-                        focus:border-green-500
-                      "
-                    />
-                  )}
-                </div>
-
-                {/* CARD */}
-                <div
-                  onClick={() => setPaymentMethod("card")}
-                  className={`
-                    p-4 rounded-xl cursor-pointer border transition
-                    ${
-                      paymentMethod === "card"
-                        ? "border-green-500 bg-green-500/10"
-                        : "border-zinc-800 hover:border-zinc-600"
-                    }
-                  `}
-                >
-                  <p className="text-white font-medium">
-                    Credit / Debit Card
-                  </p>
                   <p className="text-gray-400 text-sm">
-                    Secure card payment
+                    Razorpay / UPI / Card
                   </p>
                 </div>
 
               </div>
             </div>
-
           </div>
 
-          {/* RIGHT SIDE */}
+          {/* RIGHT */}
+
           <div className="sticky top-24 h-fit">
 
-            <div className="
-              bg-[#0f0f0f]
-              border border-zinc-800
-              rounded-xl
-              p-6
-              space-y-6
-            ">
+            <div
+              className="
+                bg-[#0f0f0f]
+                border border-zinc-800
+                rounded-xl
+                p-6
+                space-y-6
+              "
+            >
 
               <h2 className="text-lg font-semibold text-white">
                 Order Summary
               </h2>
 
               <div className="space-y-3 text-sm">
-                {cart.map((item) => (
-                  <div key={item.id} className="flex justify-between text-gray-400">
-                    <span>{item.name} × {item.quantity}</span>
-                    <span className="text-white">
-                      ₹{item.price * item.quantity}
-                    </span>
-                  </div>
-                ))}
+
+                {cart.map(
+                  (item) => (
+                    <div
+                      key={item.id}
+                      className="flex justify-between text-gray-400"
+                    >
+                      <span>
+                        {item.name} ×{" "}
+                        {
+                          item.quantity
+                        }
+                      </span>
+
+                      <span className="text-white">
+                        ₹
+                        {item.price *
+                          item.quantity}
+                      </span>
+                    </div>
+                  )
+                )}
+
               </div>
 
               <div className="border-t border-zinc-800"></div>
 
               <div className="flex justify-between items-center">
-                <span className="text-white">Total</span>
+                <span className="text-white">
+                  Total
+                </span>
+
                 <span className="text-xl font-bold text-green-400">
-                  ₹{totalPrice}
+                  ₹
+                  {totalPrice}
                 </span>
               </div>
 
               <button
-                onClick={handlePlaceOrder}
+                onClick={
+                  handlePlaceOrder
+                }
                 disabled={loading}
                 className="
                   w-full h-12
@@ -278,17 +520,15 @@ export default function Checkout() {
                   transition
                 "
               >
-                {loading ? "Processing..." : "Place Order"}
+                {loading
+                  ? "Processing..."
+                  : "Place Order"}
               </button>
 
             </div>
-
           </div>
-
         </div>
-
       </div>
-
     </PageContainer>
-  )
+  );
 }

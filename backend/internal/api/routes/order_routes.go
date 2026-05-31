@@ -4,9 +4,9 @@ import (
 	"gym-backend/internal/controllers/handlers"
 	"gym-backend/internal/middleware"
 	"gym-backend/internal/models/contracts"
+	"gym-backend/pkg/jwt"
 
 	"github.com/gin-gonic/gin"
-	"gym-backend/pkg/jwt"
 )
 
 func RegisterOrderRoutes(
@@ -18,23 +18,18 @@ func RegisterOrderRoutes(
 
 	auth := middleware.AuthMiddleware(jwtManager, userRepo)
 
-	// =====================
-	// ORDER ROUTES
-	// =====================
-	orderGroup := r.Group("/orders")
-	orderGroup.Use(auth)
+	orders := r.Group("/orders")
+	orders.Use(auth)
 	{
-		orderGroup.POST("", orderController.CreateOrder)
-		orderGroup.GET("", orderController.GetUserOrders)
-		orderGroup.GET("/:id", orderController.GetOrderByID)
+		orders.POST("", orderController.CreateOrder)
+		orders.GET("", orderController.GetUserOrders)
+		orders.GET("/:id", orderController.GetOrderByID)
+		orders.PATCH("/:id/cancel", orderController.CancelOrder)
 	}
 
-	// =====================
-	// PAYMENT ROUTES
-	// =====================
-	paymentGroup := r.Group("/payments")
-	paymentGroup.Use(auth)
+	payments := r.Group("/payments")
+	payments.Use(auth)
 	{
-		paymentGroup.POST("/verify", orderController.VerifyPayment)
+		payments.POST("/verify", orderController.VerifyPayment)
 	}
 }

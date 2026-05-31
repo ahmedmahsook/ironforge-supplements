@@ -11,4 +11,7 @@ type ProductRepository interface {
 	GetByID(id uint) (*entities.Product, error)
 	Update(product *entities.Product) error
 	Delete(id uint) error
+
+	// 🔥 ADD THIS
+	CountProducts() (int64, error)
 }

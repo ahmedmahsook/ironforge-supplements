@@ -49,18 +49,17 @@ func (pc *ProductController) GetProducts(c *gin.Context) {
 	filter.Search = c.Query("search")
 	filter.Category = c.Query("category")
 
-	if min := c.Query("minPrice"); min != "" {
-		if val, err := strconv.Atoi(min); err == nil {
-			filter.MinPrice = val
-		}
+if min := c.Query("min_price"); min != "" {
+	if val, err := strconv.Atoi(min); err == nil {
+		filter.MinPrice = val
 	}
+}
 
-	if max := c.Query("maxPrice"); max != "" {
-		if val, err := strconv.Atoi(max); err == nil {
-			filter.MaxPrice = val
-		}
+if max := c.Query("max_price"); max != "" {
+	if val, err := strconv.Atoi(max); err == nil {
+		filter.MaxPrice = val
 	}
-
+}
 	if page := c.Query("page"); page != "" {
 		if val, err := strconv.Atoi(page); err == nil {
 			filter.Page = val

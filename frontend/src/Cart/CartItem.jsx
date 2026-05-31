@@ -1,13 +1,23 @@
-export default function CartItem({ item, onRemove, onUpdateQuantity }) {
+export default function CartItem({
+  item,
+  onRemove,
+  onUpdateQuantity,
+}) {
   const handleDecrease = () => {
     if (item.quantity > 1) {
-      onUpdateQuantity(item.id, item.quantity - 1)
+      onUpdateQuantity(
+        item.product_id,
+        item.quantity - 1
+      );
     }
-  }
+  };
 
   const handleIncrease = () => {
-    onUpdateQuantity(item.id, item.quantity + 1)
-  }
+    onUpdateQuantity(
+      item.product_id,
+      item.quantity + 1
+    );
+  };
 
   return (
     <div
@@ -20,13 +30,11 @@ export default function CartItem({ item, onRemove, onUpdateQuantity }) {
         hover:shadow-lg hover:shadow-black/30
       "
     >
-      
       <img
         src={item.image}
         alt={item.name}
         className="w-20 h-20 object-cover rounded-lg"
       />
-
 
       <div className="flex-1 min-w-0">
         <h3 className="text-white font-medium text-sm truncate">
@@ -75,7 +83,9 @@ export default function CartItem({ item, onRemove, onUpdateQuantity }) {
       </div>
 
       <button
-        onClick={() => onRemove(item.id)}
+        onClick={() =>
+          onRemove(item.product_id)
+        }
         className="
           text-xs
           text-[#8a8a8a]
@@ -86,5 +96,5 @@ export default function CartItem({ item, onRemove, onUpdateQuantity }) {
         Remove
       </button>
     </div>
-  )
+  );
 }

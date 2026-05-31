@@ -5,60 +5,77 @@ import "time"
 // ======================
 // ORDER
 // ======================
+
 type Order struct {
-	ID uint `gorm:"primaryKey"`
+	ID uint `gorm:"primaryKey" json:"id"`
 
-	// Keep string to avoid breaking your project
-	UserID string `gorm:"not null;index"`
+	UserID string `gorm:"not null;index" json:"userId"`
 
-	//  Pricing
-	TotalAmount int    `gorm:"not null"`
-	Status      string `gorm:"default:pending"` // pending, placed, shipped, delivered, cancelled
+	User User `gorm:"foreignKey:UserID;references:ID" json:"user"`
 
-	//  Payment
-	PaymentMethod string `gorm:"not null"`        // COD, Razorpay
-	PaymentStatus string `gorm:"default:pending"` // pending, paid, failed
-	PaymentID     string                          // razorpay_order_id
+	// PRICING
 
-	ExpiresAt *time.Time
+	TotalAmount int `gorm:"not null" json:"totalAmount"`
 
+	Status string `gorm:"default:pending" json:"status"`
 
-	// ADDRESS (FROM REQUEST)
-	
-	Name      string `gorm:"not null"`
-	Phone     string `gorm:"not null"`
-	HouseName string `gorm:"not null"`
-	Street    string `gorm:"not null"`
-	City      string `gorm:"not null"`
-	State     string `gorm:"not null"`
-	Pincode   string `gorm:"not null"`
+	// PAYMENT
 
-	// ======================
-	//  RELATIONS
-	// ======================
-	Items []OrderItem `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE"`
+	PaymentMethod string `gorm:"not null" json:"paymentMethod"`
 
-	// ======================
+	PaymentStatus string `gorm:"default:pending" json:"paymentStatus"`
+
+	PaymentID string `json:"paymentId"`
+
+	ExpiresAt *time.Time `json:"expiresAt"`
+
+	// ADDRESS
+
+	Name string `gorm:"not null" json:"name"`
+
+	Phone string `gorm:"not null" json:"phone"`
+
+	HouseName string `gorm:"not null" json:"houseName"`
+
+	Street string `gorm:"not null" json:"street"`
+
+	City string `gorm:"not null" json:"city"`
+
+	State string `gorm:"not null" json:"state"`
+
+	Pincode string `gorm:"not null" json:"pincode"`
+
+	// RELATIONS
+
+	Items []OrderItem `gorm:"foreignKey:OrderID;constraint:OnDelete:CASCADE" json:"items"`
+
 	// TIMESTAMPS
-	// ======================
-	CreatedAt time.Time
-	UpdatedAt time.Time
+
+	CreatedAt time.Time `json:"createdAt"`
+
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // ======================
 // ORDER ITEM
 // ======================
+
 type OrderItem struct {
-	ID uint `gorm:"primaryKey"`
+	ID uint `gorm:"primaryKey" json:"id"`
 
-	OrderID   uint `gorm:"not null;index"`
-	ProductID uint `gorm:"not null;index"`
+	OrderID uint `gorm:"not null;index" json:"orderId"`
 
-	//  Snapshot of product at time of order
-	Name     string `gorm:"not null"`
-	Price    int    `gorm:"not null"`
-	Quantity int    `gorm:"not null"`
-	Total    int    `gorm:"not null"`
+	ProductID uint `gorm:"not null;index" json:"productId"`
 
-	CreatedAt time.Time
+	// SNAPSHOT
+
+	Name string `gorm:"not null" json:"name"`
+
+	Price int `gorm:"not null" json:"price"`
+
+	Quantity int `gorm:"not null" json:"quantity"`
+
+	Total int `gorm:"not null" json:"total"`
+
+	CreatedAt time.Time `json:"createdAt"`
 }

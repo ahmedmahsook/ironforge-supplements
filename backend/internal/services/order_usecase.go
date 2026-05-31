@@ -20,13 +20,13 @@ type OrderService struct {
 	razorpay  *razorpay.RazorpayClient
 }
 
-
 func NewOrderService(
 	orderRepo contracts.OrderRepository,
 	cartRepo contracts.CartRepository,
 	db *gorm.DB,
 	rzp *razorpay.RazorpayClient,
 ) *OrderService {
+
 	return &OrderService{
 		orderRepo: orderRepo,
 		cartRepo:  cartRepo,
@@ -35,28 +35,44 @@ func NewOrderService(
 	}
 }
 
-
+//
+// ======================
 // CREATE ORDER
+// ======================
+//
 
 func (s *OrderService) CreateOrder(
 	userID string,
 	req dto.CreateOrderRequest,
 ) (*entities.Order, error) {
 
-	//  Check existing pending order
+	// Existing pending order
+
 	existing, err := s.orderRepo.GetPendingByUser(userID)
+
 	if err != nil {
 		return nil, err
 	}
 
+	// Reuse ONLY COD pending orders
+
 	if existing != nil {
-		if existing.ExpiresAt != nil && time.Now().Before(*existing.ExpiresAt) {
-			return existing, nil
-		}
+
+	// Reuse ONLY COD pending orders
+
+	if strings.ToLower(req.PaymentMethod) == "cod" &&
+		strings.ToLower(existing.PaymentMethod) == "cod" &&
+		existing.ExpiresAt != nil &&
+		time.Now().Before(*existing.ExpiresAt) {
+
+		return existing, nil
 	}
+}
 
 	// Get cart
+
 	cart, err := s.cartRepo.GetByUserID(userID)
+
 	if err != nil {
 		return nil, err
 	}
@@ -65,10 +81,10 @@ func (s *OrderService) CreateOrder(
 		return nil, errors.New("cart is empty")
 	}
 
-	//  Expiry (20 mins)
+	// Order expiry
+
 	expiry := time.Now().Add(20 * time.Minute)
 
-	// Create order (INCLUDING ADDRESS SNAPSHOT)
 	order := &entities.Order{
 		UserID:        userID,
 		Status:        "pending",
@@ -76,7 +92,8 @@ func (s *OrderService) CreateOrder(
 		PaymentStatus: "pending",
 		ExpiresAt:     &expiry,
 
-		//  Address mapping (CRITICAL)
+		// Address snapshot
+
 		Name:      req.Name,
 		Phone:     req.Phone,
 		HouseName: req.HouseName,
@@ -88,9 +105,12 @@ func (s *OrderService) CreateOrder(
 
 	total := 0
 
-	// Cart → OrderItems
+	// Cart -> OrderItems
+
 	for _, item := range cart.Items {
+
 		price := item.Product.Price
+
 		qty := item.Quantity
 
 		orderItem := entities.OrderItem{
@@ -102,27 +122,40 @@ func (s *OrderService) CreateOrder(
 		}
 
 		total += orderItem.Total
-		order.Items = append(order.Items, orderItem)
+
+		order.Items = append(
+			order.Items,
+			orderItem,
+		)
 	}
 
 	order.TotalAmount = total
 
-	//  Razorpay (optional)
+	// Razorpay order creation
+
 	if strings.ToLower(req.PaymentMethod) == "razorpay" {
-		paymentOrder, err := s.razorpay.CreateOrder(order.TotalAmount)
+
+		paymentOrder, err := s.razorpay.CreateOrder(
+			order.TotalAmount,
+		)
+
 		if err != nil {
 			return nil, err
 		}
 
 		id, ok := paymentOrder["id"].(string)
+
 		if !ok {
-			return nil, errors.New("failed to parse razorpay order id")
+			return nil, errors.New(
+				"failed to parse razorpay order id",
+			)
 		}
 
 		order.PaymentID = id
 	}
 
-	// save order
+	// Save order
+
 	if err := s.orderRepo.Create(order); err != nil {
 		return nil, err
 	}
@@ -130,8 +163,11 @@ func (s *OrderService) CreateOrder(
 	return order, nil
 }
 
-
+//
+// ======================
 // VERIFY PAYMENT
+// ======================
+//
 
 func (s *OrderService) VerifyPayment(
 	userID string,
@@ -140,96 +176,127 @@ func (s *OrderService) VerifyPayment(
 	razorpaySignature string,
 ) error {
 
-	
-	/*
-	err := s.razorpay.VerifySignature(
+	order, err := s.orderRepo.GetByPaymentID(
 		razorpayOrderID,
-		razorpayPaymentID,
-		razorpaySignature,
 	)
 	if err != nil {
 		return err
 	}
-	*/
 
-	// 🔍 Get order
-	order, err := s.orderRepo.GetByPaymentID(razorpayOrderID)
-	if err != nil {
-		return err
+	if order == nil {
+		return errors.New("order not found")
 	}
 
 	// Expiry check
-	if order.ExpiresAt != nil && time.Now().After(*order.ExpiresAt) {
+	if order.ExpiresAt != nil &&
+		time.Now().After(*order.ExpiresAt) {
+
 		return errors.New("order expired")
 	}
 
-	// Prevent duplicate
+	// Prevent duplicate verification
 	if order.PaymentStatus == "paid" {
-		return errors.New("payment already verified")
+		return errors.New(
+			"payment already verified",
+		)
 	}
 
-	//  Transaction
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	// Verify Razorpay signature
+	if err := s.razorpay.VerifySignature(
+		razorpayOrderID,
+		razorpayPaymentID,
+		razorpaySignature,
+	); err != nil {
+		return err
+	}
 
-		order.PaymentStatus = "paid"
-		order.Status = "confirmed"
+	// Transaction
+	return s.db.Transaction(
+		func(tx *gorm.DB) error {
 
-		if err := s.orderRepo.Update(order); err != nil {
-			return err
-		}
+			err := tx.Model(&entities.Order{}).
+				Where("id = ?", order.ID).
+				Updates(map[string]interface{}{
+					"status":         "confirmed",
+					"payment_status": "paid",
+				}).Error
 
-		//  Clear cart
-		if err := s.cartRepo.ClearCartWithTx(tx, userID); err != nil {
-			return err
-		}
+			if err != nil {
+				return err
+			}
 
-		return nil
-	})
+			// Clear cart
+			if err := s.cartRepo.ClearCartWithTx(
+				tx,
+				userID,
+			); err != nil {
+				return err
+			}
+
+			return nil
+		},
+	)
 }
 
+//
 // ======================
-// GET USER ORDERS
+// CANCEL ORDER
 // ======================
-func (s *OrderService) GetUserOrders(userID string) ([]entities.Order, error) {
-	return s.orderRepo.GetByUserID(userID)
-}
+//
 
-// ======================
-// GET ORDER BY ID
-// ======================
-func (s *OrderService) GetOrderByID(id uint) (*entities.Order, error) {
-	return s.orderRepo.GetByID(id)
-}
-
-func (s *OrderService) CancelOrder(userID string, orderID uint) error {
+func (s *OrderService) CancelOrder(
+	userID string,
+	orderID uint,
+) error {
 
 	order, err := s.orderRepo.GetByID(orderID)
 	if err != nil {
 		return err
 	}
 
-	// 🔐 Ownership check
+	if order == nil {
+		return errors.New("order not found")
+	}
+
 	if order.UserID != userID {
 		return errors.New("unauthorized")
 	}
 
-	// ❌ Already cancelled
 	if order.Status == "cancelled" {
-		return errors.New("order already cancelled")
+		return errors.New(
+			"order already cancelled",
+		)
 	}
 
-	// ❌ Block after shipped/delivered
-	if order.Status == "shipped" || order.Status == "delivered" {
-		return errors.New("cannot cancel after shipping")
+	if order.Status == "shipped" ||
+		order.Status == "delivered" {
+
+		return errors.New(
+			"cannot cancel after shipping",
+		)
 	}
 
-	// ✅ Allowed (pending / confirmed)
 	order.Status = "cancelled"
 
-	// (optional) if you want to reflect payment state for COD:
-	// if order.PaymentMethod == "COD" {
-	// 	order.PaymentStatus = "failed"
-	// }
-
 	return s.orderRepo.Update(order)
+}
+
+//
+// ======================
+// USER ORDERS
+// ======================
+//
+
+func (s *OrderService) GetUserOrders(
+	userID string,
+) ([]entities.Order, error) {
+
+	return s.orderRepo.GetByUserID(userID)
+}
+
+func (s *OrderService) GetOrderByID(
+	id uint,
+) (*entities.Order, error) {
+
+	return s.orderRepo.GetByID(id)
 }

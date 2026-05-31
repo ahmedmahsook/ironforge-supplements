@@ -14,4 +14,9 @@ type UserRepository interface {
 	CreateRefreshToken(token *entities.RefreshToken) error
 	FindRefreshTokenByID(id uuid.UUID) (*entities.RefreshToken, error)
 	DeleteRefreshToken(id uuid.UUID) error
+
+	// 🔥 ADD THIS
+	CountUsers() (int64, error)
+GetAllUsers(page int, limit int, search string) ([]entities.User, int64, error)
+    UpdateStatus(userID uuid.UUID, isBlocked bool) error
 }

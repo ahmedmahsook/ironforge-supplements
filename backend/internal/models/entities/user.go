@@ -8,20 +8,18 @@ import (
 )
 
 type User struct {
-	ID uuid.UUID `gorm:"type:uuid;primaryKey"`
+	ID uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 
-	Name     string `gorm:"not null"`
-	Email    string `gorm:"unique;not null"`
-	Password string `gorm:"not null"`
+	Name     string `gorm:"not null" json:"name"`
+	Email    string `gorm:"unique;not null" json:"email"`
+	Password string `gorm:"not null" json:"-"`
 
-	Role       string `gorm:"default:user"` 
-	IsVerified bool   `gorm:"default:false"`
+	Role       string `gorm:"default:user" json:"role"`
+	IsVerified bool   `gorm:"default:false" json:"isVerified"`
+	IsBlocked  bool   `gorm:"default:false" json:"isBlocked"`
 
-	
-	IsBlocked bool `gorm:"default:false"`
-
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 //  Auto-generate UUID before insert
@@ -38,7 +36,13 @@ type RefreshToken struct {
 	CreatedAt time.Time
 }
 
-func (r *RefreshToken) BeforeCreate(tx *gorm.DB) error {
-	r.ID = uuid.New()
+func (r *RefreshToken) BeforeCreate(
+	tx *gorm.DB,
+) error {
+
+	if r.ID == uuid.Nil {
+		r.ID = uuid.New()
+	}
+
 	return nil
 }

@@ -9,6 +9,9 @@ import { CartProvider } from "./context/CartContext"
 import { WishlistProvider } from "./context/WishlistContext"
 
 import { Toaster } from "react-hot-toast"
+
+import 'react-loading-skeleton/dist/skeleton.css'
+
 import "./index.css"
 
 ReactDOM.createRoot(document.getElementById("root")).render(

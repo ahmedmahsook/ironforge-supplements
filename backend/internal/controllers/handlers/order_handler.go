@@ -18,8 +18,11 @@ func NewOrderController(service *services.OrderService) *OrderController {
 	return &OrderController{service: service}
 }
 
-
+//
+// ======================
 // CREATE ORDER
+// ======================
+//
 
 func (oc *OrderController) CreateOrder(c *gin.Context) {
 
@@ -45,8 +48,11 @@ func (oc *OrderController) CreateOrder(c *gin.Context) {
 	c.JSON(http.StatusCreated, dto.ToOrderResponse(*order))
 }
 
-
-// VERIFY PAYMENT 
+//
+// ======================
+// VERIFY PAYMENT
+// ======================
+//
 
 func (oc *OrderController) VerifyPayment(c *gin.Context) {
 
@@ -60,7 +66,6 @@ func (oc *OrderController) VerifyPayment(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid input"})
 		return
 	}
-
 
 	userID, exists := c.Get("user_id")
 	if !exists {
@@ -84,8 +89,11 @@ func (oc *OrderController) VerifyPayment(c *gin.Context) {
 	})
 }
 
-
+//
+// ======================
 // GET USER ORDERS
+// ======================
+//
 
 func (oc *OrderController) GetUserOrders(c *gin.Context) {
 
@@ -104,8 +112,11 @@ func (oc *OrderController) GetUserOrders(c *gin.Context) {
 	c.JSON(http.StatusOK, dto.ToOrderList(orders))
 }
 
-
+//
+// ======================
 // GET ORDER BY ID
+// ======================
+//
 
 func (oc *OrderController) GetOrderByID(c *gin.Context) {
 
@@ -125,6 +136,12 @@ func (oc *OrderController) GetOrderByID(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.ToOrderResponse(*order))
 }
+
+//
+// ======================
+// CANCEL ORDER
+// ======================
+//
 
 func (oc *OrderController) CancelOrder(c *gin.Context) {
 

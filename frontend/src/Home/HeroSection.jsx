@@ -29,7 +29,7 @@ export default function HeroSection() {
               scale-105
             "
           >
-            <source src="/videos/hero.mp4" type="video/mp4" />
+            <source src="https://res.cloudinary.com/driapshxj/video/upload/hero_lctzqh.mp4" type="video/mp4" />
           </video>
 
           {/* GRADIENT OVERLAY */}

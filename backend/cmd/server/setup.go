@@ -25,17 +25,14 @@ func Setup() (
 	*handlers.CartController,
 	*handlers.WishlistController,
 	*handlers.OrderController,
+	*handlers.AdminController,
 	contracts.UserRepository,
 	*jwt.JWTManager,
 ) {
 
+	cfg := bootstrap.Init()
 
-	// SINGLE SOURCE OF TRUTH
-	cfg := bootstrap.Init() 
-
-
-	// CLOUDINARY
-
+	// Cloudinary
 	if cfg.Cloudinary.CloudURL == "" {
 		log.Fatal("CLOUDINARY_URL not set")
 	}
@@ -44,24 +41,29 @@ func Setup() (
 		log.Fatal("Cloudinary init failed:", err)
 	}
 
-
-	// REDIS
-
+	// Redis
 	redisClient := redis.NewRedis(cfg.Redis)
 
+	// JWT Durations
+	accessTTL, err := time.ParseDuration(cfg.JWT.Expiry)
+	if err != nil {
+		log.Fatal("invalid JWT expiry")
+	}
+
+	refreshTTL, err := time.ParseDuration(cfg.JWT.RefreshExpiry)
+	if err != nil {
+		log.Fatal("invalid refresh expiry")
+	}
 
 	// JWT
-
 	jwtManager := jwt.NewJWTManager(
 		cfg.JWT.Secret,
 		cfg.JWT.RefreshSecret,
-		time.Duration(cfg.JWT.AccessTTLMin)*time.Minute,
-		time.Duration(cfg.JWT.RefreshTTLHr)*time.Hour,
+		accessTTL,
+		refreshTTL,
 	)
 
-
-	// RAZORPAY
-
+	// Razorpay
 	if cfg.Razorpay.KeyID == "" || cfg.Razorpay.KeySecret == "" {
 		log.Fatal("Razorpay keys not set")
 	}
@@ -71,49 +73,57 @@ func Setup() (
 		cfg.Razorpay.KeySecret,
 	)
 
+	// Database
+	db := database.DB
 
-	// REPOSITORIES (use global DB)
+	// Repositories
+	userRepo := postgres.NewUserRepository(db)
+	productRepo := postgres.NewProductRepository(db)
+	cartRepo := postgres.NewCartRepository(db)
+	wishlistRepo := postgres.NewWishlistRepository(db)
+	orderRepo := postgres.NewOrderRepository(db)
 
-	userRepo := postgres.NewUserRepository(database.DB)
-	productRepo := postgres.NewProductRepository(database.DB)
-	cartRepo := postgres.NewCartRepository(database.DB)
-	wishlistRepo := postgres.NewWishlistRepository(database.DB)
-	orderRepo := postgres.NewOrderRepository(database.DB)
-
-
-	// SERVICES
-
+	// Services
 	authService := services.NewAuthService(userRepo, redisClient, jwtManager)
 	productService := services.NewProductService(productRepo)
-	cartService := services.NewCartService(cartRepo, productRepo)                                                                                                                                                                                       
+	cartService := services.NewCartService(cartRepo, productRepo)
 	wishlistService := services.NewWishlistService(wishlistRepo, productRepo)
 
 	orderService := services.NewOrderService(
 		orderRepo,
 		cartRepo,
-		database.DB,
+		db,
 		razorpayClient,
 	)
 
-	// CONTROLLERS
-	
+	adminService := services.NewAdminService(
+		userRepo,
+		productRepo,
+		orderRepo,
+	)
+
+	// Controllers
 	authController := handlers.NewAuthController(authService)
 	productController := handlers.NewProductController(productService)
 	cartController := handlers.NewCartController(cartService)
-	wishlistController := handlers.NewWishlistController(wishlistService, cartService)
+
+	wishlistController := handlers.NewWishlistController(
+		wishlistService,
+		cartService,
+	)
+
 	orderController := handlers.NewOrderController(orderService)
+	adminController := handlers.NewAdminController(adminService)
 
 	return authController,
 		productController,
 		cartController,
 		wishlistController,
 		orderController,
+		adminController,
 		userRepo,
 		jwtManager
 }
-
-
-// ROUTES REGISTRATION
 
 func RegisterRoutes(
 	r *gin.Engine,
@@ -122,13 +132,45 @@ func RegisterRoutes(
 	cartController *handlers.CartController,
 	wishlistController *handlers.WishlistController,
 	orderController *handlers.OrderController,
+	adminController *handlers.AdminController,
 	userRepo contracts.UserRepository,
 	jwtManager *jwt.JWTManager,
 ) {
 
 	routes.RegisterAuthRoutes(r, authController, jwtManager, userRepo)
-	routes.RegisterProductRoutes(r, productController, jwtManager, userRepo)
-	routes.RegisterCartRoutes(r, cartController, jwtManager, userRepo)
-	routes.RegisterWishlistRoutes(r, wishlistController, jwtManager, userRepo)
-	routes.RegisterOrderRoutes(r, orderController, jwtManager, userRepo)
+
+	routes.RegisterProductRoutes(
+		r,
+		productController,
+		jwtManager,
+		userRepo,
+	)
+
+	routes.RegisterCartRoutes(
+		r,
+		cartController,
+		jwtManager,
+		userRepo,
+	)
+
+	routes.RegisterWishlistRoutes(
+		r,
+		wishlistController,
+		jwtManager,
+		userRepo,
+	)
+
+	routes.RegisterOrderRoutes(
+		r,
+		orderController,
+		jwtManager,
+		userRepo,
+	)
+
+	routes.RegisterAdminRoutes(
+		r,
+		adminController,
+		jwtManager,
+		userRepo,
+	)
 }

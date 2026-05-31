@@ -1,71 +1,107 @@
-import { useAuth } from "../context/AuthContext"
-import PageContainer from "../components/layout/PageContainer"
-import { useNavigate } from "react-router-dom"
-import toast from "react-hot-toast"
-import { Clipboard, LogOut, Package, Heart } from "lucide-react"
+import { useAuth } from "../context/AuthContext";
+import PageContainer from "../components/layout/PageContainer";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+
+import {
+  Clipboard,
+  LogOut,
+  Package,
+  Heart,
+} from "lucide-react";
 
 export default function Profile() {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
+  const { user, logout } =
+    useAuth();
 
-  if (!user) return null
+  const navigate =
+    useNavigate();
 
-  const initials = user.username
-    .split(" ")
-    .map(w => w[0])
-    .join("")
-    .toUpperCase()
+  if (!user) return null;
+
+  /* ================= SAFE NAME ================= */
+
+  const displayName =
+    user.username ||
+    user.name ||
+    "User";
+
+  const initials =
+    displayName
+      .split(" ")
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase();
+
+  /* ================= COPY EMAIL ================= */
 
   function copyEmail() {
-    navigator.clipboard.writeText(user.email)
-    toast.success("Email copied")
+    navigator.clipboard.writeText(
+      user.email
+    );
+
+    toast.success(
+      "Email copied"
+    );
   }
 
+  /* ================= LOGOUT ================= */
+
   function handleLogout() {
-    logout()
-    navigate("/login")
+    logout();
+
+    navigate("/login");
   }
 
   return (
     <PageContainer>
       <div className="max-w-6xl mx-auto px-6 py-10">
 
-        {/* TOP PROFILE CARD */}
-        <div className="
-          relative
-          border border-zinc-800
-          rounded-2xl
-          p-6 mb-8
-          bg-gradient-to-br from-[#0f0f0f] to-[#090909]
-        ">
+        {/* PROFILE HEADER */}
+
+        <div
+          className="
+            relative
+            border border-zinc-800
+            rounded-2xl
+            p-6 mb-8
+            bg-gradient-to-br
+            from-[#0f0f0f]
+            to-[#090909]
+          "
+        >
 
           <div className="flex items-center gap-5">
 
             {/* AVATAR */}
-            <div className="
-              w-16 h-16 rounded-full
-              bg-green-500/10
-              flex items-center justify-center
-              text-green-400 text-xl font-bold
-              border border-green-500/20
-            ">
+
+            <div
+              className="
+                w-16 h-16 rounded-full
+                bg-green-500/10
+                flex items-center justify-center
+                text-green-400 text-xl font-bold
+                border border-green-500/20
+              "
+            >
               {initials}
             </div>
 
             {/* USER INFO */}
+
             <div>
               <h1 className="text-2xl font-semibold text-white">
-                {user.username}
+                {displayName}
               </h1>
 
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-400 mt-1">
                 {user.email}
               </p>
             </div>
-
           </div>
 
-          {/* QUICK ACTION */}
+          {/* COPY EMAIL */}
+
           <button
             onClick={copyEmail}
             className="
@@ -76,47 +112,76 @@ export default function Profile() {
               transition
             "
           >
-            <Clipboard size={14} /> Copy Email
+            <Clipboard size={14} />
+            Copy Email
           </button>
-
         </div>
 
-        {/* GRID LAYOUT */}
+        {/* GRID */}
+
         <div className="grid lg:grid-cols-3 gap-6">
 
-          {/* LEFT - DETAILS */}
-          <div className="lg:col-span-2 border border-zinc-800 rounded-xl p-6">
+          {/* LEFT */}
 
-            <h2 className="text-white font-semibold mb-5">
-              Account Details
-            </h2>
+          <div className="lg:col-span-2">
 
-            <div className="space-y-4">
+            {/* ACCOUNT DETAILS */}
 
-              <Detail label="Role" value={user.role} capitalize />
+            <div
+              className="
+                border border-zinc-800
+                rounded-xl
+                p-6
+              "
+            >
 
-              <Detail
-                label="Status"
-                value={user.isBlocked ? "Blocked" : "Active"}
-                badge
-                danger={user.isBlocked}
-              />
+              <h2 className="text-white font-semibold mb-5">
+                Account Details
+              </h2>
 
-              <Detail
-                label="Joined"
-                value={new Date(user.createdAt).toLocaleDateString()}
-              />
+              <div className="space-y-4">
 
+                <Detail
+                  label="Status"
+                  value={
+                    user.isBlocked
+                      ? "Blocked"
+                      : "Active"
+                  }
+                  badge
+                  danger={
+                    user.isBlocked
+                  }
+                />
+
+                <Detail
+                  label="Joined"
+                  value={new Date(
+                    user.createdAt
+                  ).toLocaleDateString()}
+                />
+
+                <Detail
+                  label="Email"
+                  value={user.email}
+                />
+
+              </div>
             </div>
-
           </div>
 
-          {/* RIGHT - QUICK ACTIONS */}
+          {/* RIGHT */}
+
           <div className="space-y-4">
 
             {/* ORDERS */}
+
             <button
-              onClick={() => navigate("/orders")}
+              onClick={() =>
+                navigate(
+                  "/orders"
+                )
+              }
               className="
                 w-full flex items-center justify-between
                 border border-zinc-800
@@ -125,15 +190,25 @@ export default function Profile() {
                 transition
               "
             >
+
               <span className="text-white text-sm">
                 View Orders
               </span>
-              <Package size={18} className="text-green-400" />
+
+              <Package
+                size={18}
+                className="text-green-400"
+              />
             </button>
 
             {/* WISHLIST */}
+
             <button
-              onClick={() => navigate("/wishlist")}
+              onClick={() =>
+                navigate(
+                  "/wishlist"
+                )
+              }
               className="
                 w-full flex items-center justify-between
                 border border-zinc-800
@@ -142,13 +217,25 @@ export default function Profile() {
                 transition
               "
             >
-              <span className="text-white text-sm">
-                Wishlist
-              </span>
-              <Heart size={18} className="text-pink-400" />
+
+              <div>
+                <p className="text-white text-sm text-left">
+                  Wishlist
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1 text-left">
+                  Saved products
+                </p>
+              </div>
+
+              <Heart
+                size={18}
+                className="text-pink-400"
+              />
             </button>
 
             {/* LOGOUT */}
+
             <button
               onClick={handleLogout}
               className="
@@ -160,26 +247,36 @@ export default function Profile() {
                 transition
               "
             >
+
               <span className="text-sm">
                 Logout
               </span>
+
               <LogOut size={18} />
             </button>
-
           </div>
-
         </div>
-
       </div>
     </PageContainer>
-  )
+  );
 }
 
 /* ================= DETAIL ================= */
 
-function Detail({ label, value, badge, danger, capitalize }) {
+function Detail({
+  label,
+  value,
+  badge,
+  danger,
+}) {
   return (
-    <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+    <div
+      className="
+        flex justify-between items-center
+        border-b border-zinc-800
+        pb-3
+      "
+    >
 
       <span className="text-sm text-gray-400">
         {label}
@@ -187,7 +284,9 @@ function Detail({ label, value, badge, danger, capitalize }) {
 
       {badge ? (
         <span
-          className={`px-3 py-1 rounded-full text-xs font-medium
+          className={`
+            px-3 py-1 rounded-full
+            text-xs font-medium
             ${
               danger
                 ? "bg-red-500/10 text-red-400"
@@ -198,15 +297,10 @@ function Detail({ label, value, badge, danger, capitalize }) {
           {value}
         </span>
       ) : (
-        <span
-          className={`text-sm text-white ${
-            capitalize ? "capitalize" : ""
-          }`}
-        >
+        <span className="text-sm text-white">
           {value}
         </span>
       )}
-
     </div>
-  )
+  );
 }
